@@ -1,0 +1,4 @@
+*.o
+*.asm
+test
+*.json
