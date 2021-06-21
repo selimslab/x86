@@ -2,10 +2,7 @@ import os
 import sys 
 import tokenize 
 from tokenize import STRING, NUMBER, NAME, OP, NEWLINE, ENDMARKER
-
-
-
-
+from enum import Enum
 
 class Symbol:
     LPAREN = "("
@@ -20,25 +17,33 @@ class Op:
     DIV = "DIV"
     PUSH = "PUSH"
 
-class SymbolToOp:
-    Symbol.PLUS = Op.ADD
-    Symbol.MUL = Op.MUL
-    Symbol.DIV = Op.DIV
+operators = {
+    Symbol.PLUS : Op.ADD,
+    Symbol.MUL : Op.MUL,
+    Symbol.DIV : Op.DIV
+}
 
-
-
-
-def write_asm(asm:str)->None:
-    out_file = filename + ".asm"
+def write_asm(asm:str,out_file)->None:
     with os.open(out_file) as f:
         f.write(asm)
     
 
-
 def postfix_to_assembly(postfix:str)->str:
-    asm = []
+    asm = ""
     for c in postfix:
-        print(c)
+        if c in operators:
+            asm += F"""
+            POP CX
+            POP AX  
+            {operators.get(c)} CX
+            PUSH AX
+            """
+        else:
+            asm += f"""
+            {Op.PUSH} {c}
+            """
+    asm += "INT 20h"
+    return asm 
 
 
 
@@ -48,10 +53,14 @@ def tokens_to_postfix(tokens):
     postfix = ''
     stack = []
 
+    def should_get_from_stack(c:str):
+        # is there a higher priority element in stack 
+        return priority.get(stack[-1],-1) >= priority.get(c,0) 
+
     for token in tokens:
-        print(token)
+        # print(token)
         c = token.string
-        if token.type is NAME or token.type is NUMBER :
+        if token.type is NAME or token.type is NUMBER:
             postfix += c  
         elif token.type is OP:
             if c is Symbol.LPAREN:
@@ -59,14 +68,14 @@ def tokens_to_postfix(tokens):
             elif c is Symbol.RPAREN:
                 operator = stack.pop()
                 # pop until a left paren 
-                while stack and operator is not Symbol.LPAREN:
+                while operator is not Symbol.LPAREN:
                     postfix += operator
                     if not stack:
                         break
                     operator = stack.pop()
             else:
                 # pop operators with gte priority
-                while stack and priority.get(c,0) <= priority.get(stack[-1],0):
+                while stack and should_get_from_stack(c):
                     postfix += stack.pop()
                 stack.append(c)
 
@@ -101,8 +110,12 @@ def main():
             line_tokens.append(token)
 
     for line in lines:
+        print()
         postfix = tokens_to_postfix(line)
         print(postfix)
+        asm = postfix_to_assembly(postfix)
+        print(asm)
+
 
     print("example.asm was generated.")
 
