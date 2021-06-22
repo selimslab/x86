@@ -2,10 +2,13 @@ import os
 import io
 import sys
 import tokenize
+import logging 
 from typing import List
 from enum import Enum
-from tokenize import STRING, NUMBER, NAME, OP, NEWLINE, ENDMARKER, TokenInfo
+from tokenize import STRING, NUMBER, NAME, OP, NEWLINE, ENDMARKER, TokenInfo, TokenError
 
+logging.basicConfig()
+logging.root.setLevel(logging.INFO)
 
 class Symbol:
     LPAREN = "("
@@ -22,9 +25,6 @@ class Op:
     PUSH = "PUSH"
 
 
-operators = {Symbol.PLUS: Op.ADD, Symbol.MUL: Op.MUL, Symbol.DIV: Op.DIV}
-
-
 def infix_to_postfix(tokens: list) -> str:
     priority = {Symbol.PLUS: 1, Symbol.MUL: 2, Symbol.DIV: 2}
 
@@ -32,7 +32,6 @@ def infix_to_postfix(tokens: list) -> str:
     stack = []
 
     for token in tokens:
-        # print(token)
         c = token.string
         if token.type is NAME or token.type is NUMBER:
             postfix += c
@@ -48,12 +47,14 @@ def infix_to_postfix(tokens: list) -> str:
                         break
                     operator = stack.pop()
             else:
-                # pop operators with gte priority
+                # pop operators with greater or equal priority
                 # is there a higher priority element in stack
                 while stack and priority.get(stack[-1], -1) >= priority.get(c, 0):
                     postfix += stack.pop()
+                # push the token 
                 stack.append(c)
 
+    # pop remaining 
     while stack:
         postfix += stack.pop()
 
@@ -61,26 +62,37 @@ def infix_to_postfix(tokens: list) -> str:
 
 
 def postfix_to_assembly(postfix: str) -> str:
+    operators = {Symbol.PLUS: Op.ADD, Symbol.MUL: Op.MUL, Symbol.DIV: Op.DIV}
+
     asm_lines = []
+    start = f"""
+section .text
+
+global _start
+
+_start:
+    """
+    asm_lines.append(start)
+
     for c in postfix:
         if c in operators:
+            operation = operators.get(c)
             s = f"""
 POP CX
 POP AX  
-{operators.get(c)} CX
+{operation} CX
 PUSH AX
-
             """
         else:
             s = f"""
-{Op.PUSH} 0{c}h
-
+                {Op.PUSH} 0{c}h
             """
         asm_lines.append(s)
 
+
     asm_lines.append("INT 20h")
     asm_lines = [s.strip() for s in asm_lines]
-    asm: str = "\n".join(asm_lines)
+    asm: str = "\n\n".join(asm_lines)
     return asm
 
 
@@ -99,17 +111,22 @@ def write_asm(asm: str, out_file) -> None:
 
 def token_generator_from_file(input_file: str):
     with tokenize.open(input_file) as f:
-        tokens = tokenize.generate_tokens(f.readline)
-        for token in tokens:
-            yield token
+        try:
+            tokens = tokenize.generate_tokens(f.readline)
+            for token in tokens:
+                yield token
+        except TokenError as e:
+            logging.error(e)
 
 
 def token_generator_from_string(s: str):
     buf = io.StringIO(s)
-    tokens = tokenize.generate_tokens(buf.readline)
-    for token in tokens:
-        yield token
-
+    try:
+        tokens = tokenize.generate_tokens(buf.readline)
+        for token in tokens:
+            yield token
+    except TokenError as e:
+        logging.error(e)
 
 def get_tokens_by_line(input_file) -> List[list]:
     tokens_for_lines = []
@@ -127,12 +144,13 @@ def get_tokens_by_line(input_file) -> List[list]:
 
 def main():
     input_file = get_input_file()
+    output_file = "out.asm"
     tokens_for_lines = get_tokens_by_line(input_file)
     for tokens in tokens_for_lines:
         postfix = infix_to_postfix(tokens)
         print(postfix)
         asm = postfix_to_assembly(postfix)
-        write_asm(asm, "out.asm")
+        write_asm(asm, output_file)
         print()
 
 
