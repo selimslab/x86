@@ -3,6 +3,7 @@
 
 Generate 8086 code for a given infix expression 
 
+It creates .asm yet it can't print the output 
 ## Steps
 
 Implemented with stack based algorithm, pseudocode from [cs.arizona.edu](https://www2.cs.arizona.edu/classes/cs127b/fall15/infix.pdf)
@@ -24,7 +25,7 @@ python3
 
 the output will be in out.asm 
 
-## Assumptions
+## Assumptions
 
 - The expression is hexadecimal
 - It uses +, *, / operations and parantheses
